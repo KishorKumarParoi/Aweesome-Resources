@@ -1,387 +1,593 @@
-# Kubernetes Orchestration 🚀
+# Kubernetes Architecture Deep Dive 🏗️
 
-Container orchestration and management with Kubernetes.
-
----
-
-## What is Kubernetes?
-
-Kubernetes (K8s) is an open-source platform for:
-- Container orchestration
-- Service management
-- Auto-scaling
-- Self-healing
-- Declarative configuration
+Let me teach you **WHY** Kubernetes exists, **HOW** it works, and **WHAT** makes it fundamentally different from Docker.
 
 ---
 
-## Minikube Setup
+## 🤔 The Problem Docker Solves vs. The Problem Kubernetes Solves
 
-Local Kubernetes cluster for development.
+### Docker's Problem & Solution
+**Problem:** Different machines have different environments ("It works on my machine!")
 
-```bash
-# Start minikube cluster
-minikube start
+```
+Developer's Machine → Docker Container → Production Server
+                    ↓
+           Guaranteed same environment
+```
 
-# Check status
-minikube status
+**Solution:** Package app + dependencies in an image
+- ✅ Solves environment consistency
+- ❌ Doesn't solve: Scaling, networking, updates, self-healing, orchestration
 
-# Open web dashboard
-minikube dashboard
+### Kubernetes's Problem & Solution
+**Problem:** You have 100+ containers running 24/7. What if:
+- A container crashes? (restart it)
+- You need to update the app? (zero-downtime)
+- Traffic spikes? (scale automatically)
+- A node dies? (migrate containers)
+- Services need to communicate? (networking)
+- You have multiple data centers? (multi-region)
 
-# Stop cluster
-minikube stop
+**Solution:** Container orchestration platform that manages all of this automatically
 
-# Delete cluster
-minikube delete
+---
+
+## 📊 Docker vs Kubernetes: Key Differences
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      DOCKER                                  │
+├─────────────────────────────────────────────────────────────┤
+│ Level: Container runtime (single host)                       │
+│ Scope: Package applications in images                        │
+│ Problem Solved: Environment consistency                      │
+│ Scale: Single machine or small clusters                      │
+│ Management: Manual (you run containers)                      │
+│ Example: "Run nginx container on my server"                  │
+└─────────────────────────────────────────────────────────────┘
+                            ↓ (uses)
+┌─────────────────────────────────────────────────────────────┐
+│                    KUBERNETES                                │
+├─────────────────────────────────────────────────────────────┤
+│ Level: Orchestration platform (cluster)                      │
+│ Scope: Manage 1000s of containers across machines            │
+│ Problem Solved: Deployment, scaling, networking, resilience │
+│ Scale: Enterprise-grade (thousands of containers)            │
+│ Management: Declarative (you declare desired state)          │
+│ Example: "Run 3 nginx instances, auto-scale to 5 if CPU>80%"│
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Core Concepts
+## 🏗️ Kubernetes Architecture Overview
 
-### Pods
-Smallest deployable unit (usually one container per pod).
+### The Three-Tier Architecture
 
-### Deployments
-Manage replicas of pods with desired state.
-
-### Services
-Network abstraction to expose pods.
-
-### ConfigMaps & Secrets
-Configuration and sensitive data storage.
-
-### Persistent Volumes (PV)
-Storage that outlives pods.
-
-### Namespaces
-Virtual clusters for isolation.
-
----
-
-## Deployments
-
-### Create Deployment
-
-```bash
-# Create deployment
-kubectl create deployment my-nginx --image=nginx:latest
-
-# View deployments
-kubectl get deployments
-
-# View pods
-kubectl get pods
-
-# Describe pod (detailed info)
-kubectl describe pod <pod_name>
-
-# View deployment status
-kubectl get deployment my-nginx -o wide
-
-# Delete deployment
-kubectl delete deployment my-web-app
+```
+┌──────────────────────────────────────────────────────────┐
+│                  CONTROL PLANE (Master)                   │
+│  (Makes decisions about cluster - ONE or HA setup)        │
+├──────────────────────────────────────────────────────────┤
+│  • API Server: Entry point for all operations             │
+│  • Controller Manager: Ensures desired state              │
+│  • Scheduler: Assigns pods to nodes                       │
+│  • etcd: Cluster database (single source of truth)        │
+└──────────────────────────────────────────────────────────┘
+           ↓ (manages)
+┌──────────────────────────────────────────────────────────┐
+│  WORKER NODES (Multiple machines where apps run)          │
+├──────────────────────────────────────────────────────────┤
+│ Node 1        Node 2        Node 3      ... Node N        │
+│ ┌──────────┐ ┌──────────┐ ┌──────────┐                    │
+│ │ kubelet  │ │ kubelet  │ │ kubelet  │  (agent)           │
+│ │ kube-   │ │ kube-   │ │ kube-   │  (proxy)             │
+│ │ proxy   │ │ proxy   │ │ proxy   │                     │
+│ │ Docker  │ │ Docker  │ │ Docker  │  (runtime)           │
+│ └──────────┘ └──────────┘ └──────────┘                    │
+│   ┌─────┐     ┌─────┐     ┌─────┐                        │
+│   │Pod │     │Pod │     │Pod │    (running containers)   │
+│   └─────┘     └─────┘     └─────┘                        │
+└──────────────────────────────────────────────────────────┘
+           ↓ (network & storage)
+┌──────────────────────────────────────────────────────────┐
+│              SUPPORTING SERVICES                           │
+│  • CNI (Network): Flannel, Calico, Weave                  │
+│  • Storage: PV, PVC, Storage Classes                      │
+│  • Monitoring: Prometheus, Grafana                        │
+│  • Logging: ELK, Fluentd                                  │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Scaling
+## 🔧 Core Kubernetes Components Explained
 
-### Scale Replicas
+### **Control Plane Components** (Decision-making)
 
-```bash
-# Scale up to 3 replicas
-kubectl scale deployment my-nginx --replicas=3
+#### 1. **API Server** 
+The "receptionist" of the cluster.
 
-# Scale down to 1 replica
-kubectl scale deployment my-nginx --replicas=1
+```
+What it does:
+  Your command → API Server → Validation → etcd (database)
+                        ↓
+           REST API endpoint for all operations
 
-# View current replicas
-kubectl get deployment my-nginx
+Why it matters:
+  • Single entry point for all cluster operations
+  • Validates requests
+  • Converts YAML to cluster changes
+  • Authentication & authorization
+
+Example:
+  $ kubectl apply -f deploy.yml
+  └─> Hits API Server → Validates → Stores in etcd → 
+      Controllers respond to changes
 ```
 
-### Auto-scaling
+#### 2. **Controller Manager**
+The "police officer" ensuring rules are followed.
 
-```bash
-# Enable auto-scaling
-kubectl autoscale deployment my-nginx --min=2 --max=10 --cpu-percent=80
+```
+What it does:
+  • Watches etcd for desired state
+  • Compares desired state vs actual state
+  • Takes action to match them
 
-# View HPA (Horizontal Pod Autoscaler)
-kubectl get hpa
+Example - Deployment Controller:
+  ┌────────────────────────────────────────┐
+  │ Desired: 3 nginx pods                  │
+  │ Actual:  2 nginx pods                  │
+  │ Action:  Create 1 more pod             │
+  └────────────────────────────────────────┘
+
+Controllers that run:
+  - Deployment Controller (manage replicas)
+  - Service Controller (expose pods)
+  - Node Controller (manage nodes)
+  - StatefulSet Controller
+  - DaemonSet Controller
+  - etc.
 ```
 
----
+#### 3. **Scheduler**
+The "matchmaker" assigning pods to nodes.
 
-## Services (Expose)
+```
+What it does:
+  Pod created → Check node resources → Assign to best node
 
-### Create Service
+Scheduling logic:
+  1. Filter: Which nodes have enough CPU/memory?
+  2. Score: Which is the best fit?
+  3. Assign: Place pod on best node
 
-```bash
-# Expose deployment
-kubectl expose deployment my-nginx --port=80 --type=LoadBalancer
-
-# Expose with specific port
-kubectl expose deployment my-webapp --type=LoadBalancer --port=3002
-
-# View services
-kubectl get svc
+Example:
+  Pod: Needs 2 CPU, 4GB RAM
+  Node 1: 1 CPU free ❌
+  Node 2: 4 CPU free ✅
+  Node 3: 2 CPU free ✅
+  Decision: Assign to Node 2 (more resources)
 ```
 
-### Access Service
+#### 4. **etcd**
+The "memory" of the cluster.
 
-```bash
-# Get service access URL (minikube)
-minikube service my-nginx
-
-# Port forward to pod
-kubectl port-forward pod/<pod_name> 3000:3000
-
-# Port forward to service
-kubectl port-forward svc/my-nginx 8080:80
 ```
+What it does:
+  Stores ALL cluster state (key-value database)
 
----
+Data stored:
+  - Pod definitions
+  - Service definitions
+  - ConfigMaps & Secrets
+  - Deployment configs
+  - Persistent volumes
+  - All metadata
 
-## Pod Management
+Why critical:
+  • Single source of truth
+  • All components read from here
+  • Backup = disaster recovery
 
-### Inspect Pods
-
-```bash
-# Get pod details
-kubectl describe pod <pod_name>
-
-# View pod logs
-kubectl logs <pod_name>
-
-# Follow logs (tail -f)
-kubectl logs -f <pod_name>
-
-# Previous pod logs (if crashed)
-kubectl logs <pod_name> --previous
-
-# Execute command in pod
-kubectl exec <pod_name> -- ls -la
-```
-
-### Delete Pods
-
-```bash
-# Delete pod (replacement starts automatically)
-kubectl delete pod <pod_name>
-
-# Delete all pods in namespace
-kubectl delete pods --all
-```
-
----
-
-## Updates & Rollouts
-
-### Update Deployment
-
-```bash
-# Update image
-kubectl set image deployment my-webapp web-app=<new-image>:04
-
-# Check rollout status
-kubectl rollout status deployment my-webapp
-
-# View rollout history
-kubectl rollout history deployment my-webapp
-
-# Rollback to previous version
-kubectl rollout undo deployment my-webapp
-
-# Rollback to specific revision
-kubectl rollout undo deployment my-webapp --to-revision=2
+Structure:
+  /pods/default/my-app-pod-xyz → {...pod config...}
+  /services/default/web-service → {...service config...}
+  /nodes/node-1 → {...node status...}
 ```
 
 ---
 
-## Configuration Files
+### **Worker Node Components** (Execution)
 
-### Create Deployment from YAML
+#### 1. **Kubelet**
+The "foreman" on each worker node.
+
+```
+What it does:
+  • Receives instructions from API Server
+  • Runs containers (via Docker/container runtime)
+  • Monitors pod health
+  • Reports status back to API Server
+
+Example workflow:
+  1. Scheduler assigns pod to Node-1
+  2. Kubelet on Node-1 gets notification
+  3. Kubelet pulls Docker image
+  4. Kubelet starts container
+  5. Kubelet monitors → "Is pod healthy?"
+  6. If pod crashes → Kubelet restarts it
+  7. Reports status: "Pod running"
+```
+
+#### 2. **Kube-Proxy**
+The "network manager" on each node.
+
+```
+What it does:
+  Routes traffic between pods & services
+
+Example:
+  Client → (wants to reach Service "web-api")
+           ↓
+        Kube-proxy intercepts
+           ↓
+        Translates to actual pod IP
+           ↓
+        Routes to Pod-1 or Pod-2 (load balanced)
+
+How it works:
+  • Maintains iptables rules
+  • Updates routing when pods are created/destroyed
+  • Enables service discovery & load balancing
+```
+
+#### 3. **Container Runtime**
+Docker or another OCI-compatible runtime.
+
+```
+What it does:
+  • Actual execution of containers
+  • Starts/stops containers
+  • Manages images
+
+Kubelet says: "Start nginx container"
+Container Runtime: "✓ Done"
+```
+
+---
+
+## 🎯 How Kubernetes Works: A Real Example
+
+### Scenario: Deploy 3 nginx pods with auto-scaling
 
 ```yaml
+# Your declaration (stored in git)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: my-app
+  name: web-app
 spec:
-  replicas: 3
+  replicas: 3  # Desired state
   selector:
     matchLabels:
-      app: my-app
+      app: web-app
   template:
     metadata:
       labels:
-        app: my-app
+        app: web-app
     spec:
       containers:
-      - name: app
-        image: my-app:v1.0
-        ports:
-        - containerPort: 8000
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            configMapKeyRef:
-              name: app-config
-              key: db_url
+      - name: nginx
+        image: nginx:latest
 ```
 
-### Apply Configuration
+### What Happens Behind the Scenes:
 
-```bash
-# Apply/create from file
-kubectl apply -f deploy.yml
+```
+Step 1: User runs "kubectl apply -f deploy.yml"
+        ↓
+        API Server receives request
+        ↓
+        Validates YAML syntax
+        ↓
+        Stores in etcd: "Deployment: web-app, replicas: 3"
 
-# Apply all YAML files
-kubectl apply -f ./manifests/
+Step 2: Deployment Controller watches etcd
+        ↓
+        Sees: "Deployment created, desired replicas: 3"
+        ↓
+        Creates ReplicaSet: "Ensure 3 pods always running"
+        ↓
+        ReplicaSet creates 3 Pod definitions
+        ↓
+        etcd now has: Pod-1, Pod-2, Pod-3 definitions
 
-# Delete from configuration
-kubectl delete -f deploy.yml
+Step 3: Scheduler watches for unscheduled pods
+        ↓
+        Finds: Pod-1, Pod-2, Pod-3 (no node assigned)
+        ↓
+        Evaluates nodes:
+          Node-1: 4 CPU, 8GB memory available → Good fit
+          Node-2: 2 CPU, 4GB memory available → Okay
+          Node-3: Down → Skip
+        ↓
+        Assigns: Pod-1→Node-1, Pod-2→Node-1, Pod-3→Node-2
 
-# Get object as YAML
-kubectl get deployment my-app -o yaml
+Step 4: Kubelets get notifications
+        ↓
+        Kubelet on Node-1: "I have Pod-1 and Pod-2"
+        ↓
+        Pulls nginx image from registry
+        ↓
+        Starts 2 Docker containers
+        ↓
+        Monitors health (CPU, memory, restart if crashes)
+        ↓
+        Kubelet on Node-2: Same process for Pod-3
+
+Step 5: Kube-proxy sets up networking
+        ↓
+        Creates routing rules
+        ↓
+        Traffic to "web-app service" → Load balance across 3 pods
+
+Step 6: API Server reports status
+        ↓
+        kubectl get pods → Shows all 3 running
+```
+
+### What Makes Kubernetes Smart:
+
+```
+Scenario 1: Pod crashes
+  ┌─────────────────────────┐
+  │ Pod-1 crashes           │
+  │ Kubelet detects crash   │
+  │ Kubelet restarts Pod-1  │
+  │ Service continues       │
+  └─────────────────────────┘
+
+Scenario 2: Node-1 dies
+  ┌──────────────────────────────┐
+  │ Node-1 stops responding       │
+  │ API Server marks Node-1 "down"│
+  │ Controller Manager: "Pod-1 & 2│
+  │   were on Node-1, need to     │
+  │   create new replicas"        │
+  │ Scheduler places them on      │
+  │   Node-2 & Node-3             │
+  │ Kubelets start new containers │
+  │ OLD pods terminated           │
+  └──────────────────────────────┘
+
+Scenario 3: Traffic increases
+  ┌──────────────────────────────┐
+  │ Metrics say: CPU > 80%        │
+  │ HPA (Horizontal Pod Autoscaler)│
+  │ "Need more pods"              │
+  │ ReplicaSet: 3 → 5 replicas    │
+  │ Scheduler assigns to nodes    │
+  │ Kubelets start new containers │
+  │ Load balanced across 5 pods   │
+  └──────────────────────────────┘
 ```
 
 ---
 
-## Networking
+## 🔄 Kubernetes Workflow Diagram
 
-### Create Service YAML
+```
+                    DEVELOPER
+                        ↓
+            kubectl apply -f deploy.yml
+                        ↓
+                   API SERVER
+            (Entry point, validation)
+                        ↓
+          ┌─────────────────────────┐
+          │       etcd (Database)   │
+          │  Stores desired state   │
+          └─────────────────────────┘
+                        ↑ ↓
+         ┌──────────────────────────────────┐
+         │   CONTROLLER MANAGER             │
+         │   Watches & reacts to changes    │
+         │   (Deployment, ReplicaSet, etc)  │
+         └──────────────────────────────────┘
+                        ↓
+         ┌──────────────────────────────────┐
+         │   SCHEDULER                      │
+         │   Assigns pods to nodes          │
+         └──────────────────────────────────┘
+                        ↓
+         ┌────────────────────────────────────────────┐
+         │         WORKER NODES (Many)                │
+         ├────────────────────────────────────────────┤
+         │ Node-1         Node-2         Node-3       │
+         │ ┌──────────┐  ┌──────────┐  ┌──────────┐  │
+         │ │ Kubelet  │  │ Kubelet  │  │ Kubelet  │  │
+         │ │ Kube-    │  │ Kube-    │  │ Kube-    │  │
+         │ │ proxy    │  │ proxy    │  │ proxy    │  │
+         │ │ Docker   │  │ Docker   │  │ Docker   │  │
+         │ ├──────────┤  ├──────────┤  ├──────────┤  │
+         │ │ Pod-1    │  │ Pod-3    │  │ Pod-5    │  │
+         │ │ Pod-2    │  │ Pod-4    │  │          │  │
+         │ └──────────┘  └──────────┘  └──────────┘  │
+         └────────────────────────────────────────────┘
+                    ↓ (Monitors)
+         ┌──────────────────────────────┐
+         │ Status reported back to      │
+         │ API Server → etcd            │
+         │ (Loop continues)             │
+         └──────────────────────────────┘
+```
 
+---
+
+## 🎓 Key Kubernetes Concepts
+
+### **Pods** (smallest unit)
+```
+Pod = 1+ containers running together
+Usually: 1 app container + optional sidecar containers
+
+Why?
+  • Share network namespace (same IP)
+  • Can share storage
+  • Containers in pod tightly coupled
+
+Docker:      One container per process
+Kubernetes:  One pod per "unit of work"
+```
+
+### **ReplicaSets** (manage replicas)
+```
+"Keep exactly 3 instances of this app running"
+
+If 1 crashes:
+  ReplicaSet: "I see 2, need 3"
+  → Creates new pod
+
+If Node dies:
+  ReplicaSet: "I see 2, need 3"
+  → Creates pod on healthy node
+
+Automatic recovery = resilience
+```
+
+### **Services** (networking abstraction)
+```
+Problem:
+  Pods are temporary (IP changes when recreated)
+  How does client find the app?
+
+Solution:
+  Service = stable endpoint to access pods
+  
+Client → Service IP (stable)
+           ↓ (translates to)
+         Pod-1, Pod-2, Pod-3 (dynamic)
+
+Load balancing = automatic distribution
+```
+
+### **Namespaces** (multi-tenancy)
+```
+Logical clusters within cluster
+
+Namespace: default      → dev team
+Namespace: production   → ops team
+Namespace: monitoring   → monitoring stack
+
+Isolation: Policies prevent cross-namespace access
+```
+
+---
+
+## 🆚 Docker vs Kubernetes: Summary Table
+
+| Aspect | Docker | Kubernetes |
+|--------|--------|-----------|
+| **Scope** | Single container runtime | Container orchestration |
+| **Scale** | 1 machine (or manual cluster) | 1000s of containers |
+| **Automation** | Manual or script-based | Declarative, self-healing |
+| **Deployment** | `docker run` | `kubectl apply` |
+| **Scaling** | Manual: start/stop containers | Automatic: HPA, replicas |
+| **Self-healing** | Manual restart | Automatic restart/reschedule |
+| **Networking** | Bridge/host/overlay | Service discovery built-in |
+| **Updates** | Manual container replacement | Rolling updates, canary |
+| **Learning Curve** | Easy to learn | Steeper learning curve |
+| **Use Case** | Development, simple apps | Enterprise production |
+| **High Availability** | Manual setup | Built-in multi-node |
+
+---
+
+## 💡 When to Use What?
+
+### Use Docker:
+✅ Local development  
+✅ Testing applications  
+✅ Small deployments (< 10 servers)  
+✅ Simple microservices  
+✅ Building/shipping applications  
+
+### Use Kubernetes:
+✅ Large-scale production (enterprise)  
+✅ High availability required  
+✅ Multi-region deployments  
+✅ Complex microservices  
+✅ Auto-scaling needs  
+✅ Declarative infrastructure  
+✅ Teams managing 100+ containers  
+
+---
+
+## 🚀 Real-World Analogy
+
+### Docker = Shipping Container
+```
+"I packed my app in a container.
+ It will run the same everywhere."
+```
+
+### Kubernetes = Shipping Company
+```
+"I have 100 containers to ship worldwide.
+ You manage:
+  - Which port to send each one
+  - What to do if a truck breaks down
+  - How to balance the load
+  - How many trucks needed at peak times
+  - Where backup inventory goes"
+```
+
+---
+
+## 📚 Critical Insight: The Declarative Philosophy
+
+This is what makes Kubernetes fundamentally different:
+
+### Docker (Imperative):
+```bash
+# You tell Docker WHAT to do, STEP BY STEP
+docker run -d nginx
+docker run -d nginx
+docker run -d nginx
+
+# If one dies:
+# YOU notice → YOU restart it
+```
+
+### Kubernetes (Declarative):
 ```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-app-service
+# You declare WHAT you WANT
+apiVersion: apps/v1
+kind: Deployment
 spec:
-  type: LoadBalancer
-  selector:
-    app: my-app
-  ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 8000
+  replicas: 3
+  # Kubernetes ensures this is true 24/7
 ```
 
-### Network Types
+**You declare the goal, Kubernetes ensures it's met forever.**
 
-```bash
-# ClusterIP (default, internal only)
-kubectl expose deployment my-app --type=ClusterIP
-
-# NodePort (expose on node)
-kubectl expose deployment my-app --type=NodePort
-
-# LoadBalancer (external load balancer)
-kubectl expose deployment my-app --type=LoadBalancer
-```
+This is the **paradigm shift**:
+- Docker: "Tell me what to do"
+- Kubernetes: "Here's what I want, make it happen"
 
 ---
 
-## Storage
+## ✨ Summary
 
-### Persistent Volume & Claim
+**Docker** = Container packaging technology (HOW to run apps)
 
-```yaml
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: my-pv
-spec:
-  capacity:
-    storage: 10Gi
-  accessModes:
-    - ReadWriteOnce
-  hostPath:
-    path: "/data"
+**Kubernetes** = Container orchestration platform (WHEN, WHERE, HOW MANY to run apps)
 
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: my-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 10Gi
-```
+**Together**: Docker builds images, Kubernetes orchestrates their deployment at scale.
 
----
+**Docker without Kubernetes**: Like having perfectly packed containers but no system to manage them.
 
-## Namespaces
+**Kubernetes without Docker**: Like having an orchestration system but no containers to orchestrate.
 
-### Manage Namespaces
-
-```bash
-# View namespaces
-kubectl get namespaces
-
-# Create namespace
-kubectl create namespace my-app
-
-# Set default namespace
-kubectl config set-context --current --namespace=my-app
-
-# View resources in namespace
-kubectl get all -n my-app
-
-# Delete namespace (deletes all resources)
-kubectl delete namespace my-app
-```
-
----
-
-## ConfigMaps & Secrets
-
-### ConfigMaps
-
-```bash
-# Create from literal
-kubectl create configmap app-config --from-literal=DB_HOST=localhost
-
-# Create from file
-kubectl create configmap app-config --from-file=config.yaml
-
-# View ConfigMap
-kubectl get configmap app-config -o yaml
-```
-
-### Secrets
-
-```bash
-# Create secret
-kubectl create secret generic app-secret --from-literal=password=secret123
-
-# Create from file
-kubectl create secret generic db-credentials --from-file=./credentials
-
-# View secrets (base64 encoded)
-kubectl get secret app-secret -o yaml
-```
-
----
-
-## Useful Commands
-
-| Command | Purpose |
-|---------|---------|
-| `kubectl get pods` | List pods |
-| `kubectl describe pod <name>` | Detailed pod info |
-| `kubectl logs <pod>` | View logs |
-| `kubectl exec <pod> -- <cmd>` | Run command in pod |
-| `kubectl scale deployment <name> --replicas=3` | Scale |
-| `kubectl expose deployment <name>` | Create service |
-| `kubectl apply -f <file>` | Apply configuration |
-| `kubectl delete <resource>` | Delete resource |
-| `kubectl port-forward <pod> 8080:8000` | Port forward |
-
----
-
-**Last Updated:** December 22, 2025
+Would you like me to go deeper into any specific area (Networking, Storage, Scheduling, etcd, etc.)? 🚀
