@@ -47,18 +47,579 @@ Attach to your IAM user:
 - ✅ IAMFullAccess
 - ✅ AmazonVPCFullAccess
 
-### Setup AWS CLI
+### Note: If you know how to attach policies move to next part
 
+# AWS IAM User Creation & Configuration Guide 🔐
+
+ If you are beginner, follow this comprehensive guide for setting up the IAM user with proper permissions.
+
+---
+
+````markdown
+## Prerequisites (Before You Start)
+
+### 1. AWS Account
+- ✅ AWS account created
+- ✅ Billing enabled
+- ✅ Access to AWS Management Console
+- ✅ IAM permissions to create users
+
+### 2. Local Machine Setup
+- ✅ Python3
+- ✅ AWS CLI
+- ✅ kubectl
+- ✅ KOPS
+- ✅ Text editor (vi, nano, VS Code)
+
+### 3. AWS IAM User (Required!)
+
+⚠️ **IMPORTANT:** Do NOT use your AWS root account for KOPS!
+- Root account = full access to everything
+- If credentials leak = entire AWS account compromised
+- Use IAM user with minimal required permissions
+
+---
+
+## Create AWS IAM User with KOPS Permissions
+
+### Step 1: Create IAM User in AWS Console
+
+**Login to AWS Management Console:**
+1. Go to https://console.aws.amazon.com
+2. Login with your root account credentials
+3. Search for "IAM" in the search bar
+4. Click "IAM" service
+5. Click "Users" in the left sidebar
+6. Click "Create user" button
+
+**User Details:**
+```
+User name: kops-user
+
+Options:
+☑ Provide user access to AWS Management Console
+  - Console password: Auto-generated
+  - ☑ Users must create a new password at next sign-in
+  
+☑ Provide user access to the CLI, API, and other interfaces
+  - Access key type: Access Key (recommended)
+  - (KOPS uses these credentials)
+```
+
+**Click "Next"**
+
+---
+
+### Step 2: Add Permissions to User
+
+**On the "Set permissions" page:**
+
+Option A: **Attach Policies Directly (Recommended)**
+
+```
+Search for and select each policy:
+1. ✅ AmazonEC2FullAccess
+   └─ Allows: Create/modify EC2 instances, security groups
+   
+2. ✅ AmazonS3FullAccess
+   └─ Allows: Create/modify S3 buckets, store cluster state
+   
+3. ✅ IAMFullAccess
+   └─ Allows: Create IAM roles for EC2 instances
+   
+4. ✅ AmazonVPCFullAccess
+   └─ Allows: Create VPC, subnets, routing, internet gateways
+
+5. (Optional) AmazonRoute53FullAccess
+   └─ Allows: DNS management (if using custom domain)
+
+6. (Optional) ElasticLoadBalancingFullAccess
+   └─ Allows: Network Load Balancer management
+```
+
+**Attach All 4 Required Policies** → Click "Next"
+
+**Review:**
+- Username: kops-user
+- Permissions: 4 policies attached
+- Click "Create user"
+
+---
+
+### Step 3: Get Access Keys
+
+**After user creation:**
+
+1. Click on the newly created user (kops-user)
+2. Go to "Security credentials" tab
+3. Scroll down to "Access keys"
+4. Click "Create access key"
+
+**Access Key Options:**
+```
+Use case: Local environment
+
+☑ I understand the above recommendation and want to proceed
+  to create an access key for my AWS account.
+
+Click "Create access key"
+```
+
+**IMPORTANT: Save Your Access Keys!**
+```
+Access Key ID: AKIA...
+Secret Access Key: wJal...
+
+⚠️ SAVE THESE IMMEDIATELY!
+├─ Copy and paste into a secure file
+├─ Or use AWS CLI to configure
+└─ You won't see the secret key again!
+```
+
+**DO NOT:**
+- ❌ Share with anyone
+- ❌ Commit to Git
+- ❌ Store in plain text files
+- ❌ Upload to GitHub
+
+**Click "Download .csv file"** (secure backup)
+
+---
+
+### Step 4: Configure AWS CLI with Credentials
+
+**Run on your machine:**
 ```bash
 aws configure
-# Enter:
-# AWS Access Key ID: [Your Key]
-# AWS Secret Access Key: [Your Secret]
-# Default region: us-east-1
-# Default output format: json
+```
+
+**Enter the values you saved:**
+```
+AWS Access Key ID [None]: AKIA...
+AWS Secret Access Key [None]: wJal...
+Default region name [None]: us-east-1
+Default output format [None]: json
+```
+
+**Verify configuration:**
+```bash
+# Test credentials work
+aws sts get-caller-identity
+
+# Expected output:
+{
+    "UserId": "AIDA...",
+    "Account": "123456789012",
+    "Arn": "arn:aws:iam::123456789012:user/kops-user"
+}
+```
+
+✅ **Credentials configured successfully!**
+
+---
+
+## Understanding IAM Permissions
+
+### What Each Policy Allows:
+
+#### 1. AmazonEC2FullAccess
+```
+Allows KOPS to:
+├─ Launch EC2 instances
+├─ Create security groups
+├─ Attach IAM roles to instances
+├─ Create/modify EBS volumes
+├─ Create/modify Auto Scaling Groups
+├─ Create/modify Launch Templates
+└─ Manage instance lifecycle (start/stop/terminate)
+
+Example API calls:
+├─ ec2:RunInstances
+├─ ec2:CreateSecurityGroup
+├─ ec2:AuthorizeSecurityGroupIngress
+└─ ec2:AttachVolume
+```
+
+#### 2. AmazonS3FullAccess
+```
+Allows KOPS to:
+├─ Create S3 bucket
+├─ Upload cluster configuration
+├─ Store cluster state (etcd backups)
+├─ Read configuration when deploying
+└─ Delete cluster (if requested)
+
+Example API calls:
+├─ s3:CreateBucket
+├─ s3:PutObject
+├─ s3:GetObject
+└─ s3:DeleteObject
+```
+
+#### 3. IAMFullAccess
+```
+Allows KOPS to:
+├─ Create IAM roles for control-plane nodes
+├─ Create IAM roles for worker nodes
+├─ Create instance profiles
+├─ Attach policies to roles
+└─ Create/modify service accounts
+
+Example API calls:
+├─ iam:CreateRole
+├─ iam:PutRolePolicy
+├─ iam:CreateInstanceProfile
+└─ iam:AddRoleToInstanceProfile
+```
+
+#### 4. AmazonVPCFullAccess
+```
+Allows KOPS to:
+├─ Create VPC (virtual network)
+├─ Create subnets
+├─ Create route tables
+├─ Create internet gateways
+├─ Create Network Load Balancers
+├─ Create target groups
+└─ Configure DHCP options
+
+Example API calls:
+├─ ec2:CreateVpc
+├─ ec2:CreateSubnet
+├─ ec2:CreateInternetGateway
+├─ ec2:AttachInternetGateway
+└─ elasticloadbalancing:CreateLoadBalancer
 ```
 
 ---
+
+## Security Best Practices
+
+### ✅ DO:
+```
+✅ Create separate IAM user for KOPS
+✅ Use access keys (not root credentials)
+✅ Store credentials securely
+✅ Rotate keys every 90 days
+✅ Enable MFA on root account
+✅ Use least privilege (only needed permissions)
+✅ Monitor IAM user activity in CloudTrail
+✅ Use AWS KMS for encryption
+```
+
+### ❌ DON'T:
+```
+❌ Use AWS root account credentials
+❌ Share credentials via email/Slack
+❌ Commit credentials to Git
+❌ Use same credentials for multiple projects
+❌ Create access keys without rotation plan
+❌ Give users more permissions than needed
+❌ Store credentials in code
+❌ Use old/unused access keys
+```
+
+---
+
+## Troubleshooting AWS Credentials
+
+### Error: "Unable to locate credentials"
+```bash
+# Fix: Configure AWS CLI
+aws configure
+
+# Or check credentials file exists:
+cat ~/.aws/credentials
+
+# Expected format:
+[default]
+aws_access_key_id = AKIA...
+aws_secret_access_key = wJal...
+```
+
+### Error: "User is not authorized"
+```bash
+# Likely cause: User doesn't have required permissions
+
+# Fix: Add missing permissions in AWS Console
+1. Login as root user
+2. Go to IAM → Users → kops-user
+3. Add the missing policy
+4. Wait 1-2 minutes for permissions to propagate
+5. Retry the command
+```
+
+### Error: "Access Denied" when creating resources
+```bash
+# Verify credentials:
+aws sts get-caller-identity
+
+# Should return your user ARN, not root
+# If it shows root, you may be using wrong credentials
+
+# Check which credentials are active:
+echo $AWS_ACCESS_KEY_ID
+echo $AWS_SECRET_ACCESS_KEY
+```
+
+### Error: "No credentials found"
+```bash
+# Configure credentials:
+aws configure
+
+# Or set environment variables:
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=wJal...
+export AWS_DEFAULT_REGION=us-east-1
+```
+
+---
+
+## AWS Credential Management
+
+### Store Credentials Securely:
+
+**Option 1: AWS Credentials File (Recommended)**
+```bash
+# File: ~/.aws/credentials
+# Created by: aws configure
+
+[default]
+aws_access_key_id = AKIA...
+aws_secret_access_key = wJal...
+
+[production]
+aws_access_key_id = AKIA...
+aws_secret_access_key = wJal...
+
+# Permissions:
+chmod 600 ~/.aws/credentials  # Only you can read
+```
+
+**Option 2: Environment Variables (Temporary)**
+```bash
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=wJal...
+export AWS_DEFAULT_REGION=us-east-1
+
+# Use in scripts:
+#!/bin/bash
+# For CI/CD only!
+```
+
+**Option 3: AWS SSO (Enterprise)**
+```bash
+# For organizations using AWS SSO
+aws sso configure
+
+# Or use profile:
+aws s3 ls --profile production-user
+```
+
+**Option 4: .env File (Development Only)**
+```bash
+# File: .env (add to .gitignore)
+AWS_ACCESS_KEY_ID=AKIA...
+AWS_SECRET_ACCESS_KEY=wJal...
+AWS_DEFAULT_REGION=us-east-1
+
+# Load in terminal:
+set -a
+source .env
+set +a
+
+# ⚠️ NEVER commit to Git!
+```
+
+---
+
+## Rotate Access Keys (Every 90 Days)
+
+### Create New Access Key:
+```bash
+# 1. Login to AWS Console
+# 2. IAM → Users → kops-user
+# 3. Security credentials → Create access key
+# 4. Copy new key
+# 5. Update locally: aws configure
+# 6. Test: aws sts get-caller-identity
+```
+
+### Deactivate Old Access Key:
+```bash
+# 1. Go to IAM → Users → kops-user
+# 2. Security credentials → Access keys
+# 3. Click on old key
+# 4. Click "Deactivate"
+# 5. After 1 week: Click "Delete"
+```
+
+### Check Key Age:
+```bash
+# AWS Console → IAM → Users → kops-user
+# Security credentials → Access keys
+# Look at "Created" date
+# If > 90 days old → Rotate it!
+```
+
+---
+
+## Monitor IAM User Activity
+
+### Enable CloudTrail Logging:
+```bash
+# 1. AWS Console → CloudTrail
+# 2. Create Trail
+# 3. Log S3 bucket: (auto-created)
+# 4. Enable logging
+```
+
+### View Recent Activity:
+```bash
+# AWS Console → CloudTrail → Event history
+# Filter by username: kops-user
+# See all API calls made by this user
+```
+
+### Set Up Alerts:
+```
+# AWS Console → CloudTrail → Event selectors
+# Enable API calls logging
+# Create SNS topic for alerts
+# Alert on suspicious activities:
+├─ Multiple failed authentication attempts
+├─ Access from unusual regions
+├─ Large data transfer
+└─ Account creation/deletion attempts
+```
+
+---
+
+## Complete Setup Checklist
+
+```
+┌─ AWS Account Setup ──────────────────┐
+│ ☑ AWS account created               │
+│ ☑ Billing configured                │
+│ ☑ Root account secured (MFA)        │
+└──────────────────────────────────────┘
+         ↓
+┌─ IAM User Creation ──────────────────┐
+│ ☑ User "kops-user" created          │
+│ ☑ Access keys generated              │
+│ ☑ Keys saved securely               │
+└──────────────────────────────────────┘
+         ↓
+┌─ IAM Permissions ────────────────────┐
+│ ☑ AmazonEC2FullAccess attached       │
+│ ☑ AmazonS3FullAccess attached        │
+│ ☑ IAMFullAccess attached             │
+│ ☑ AmazonVPCFullAccess attached       │
+└──────────────────────────────────────┘
+         ↓
+┌─ Local Configuration ────────────────┐
+│ ☑ AWS CLI installed                  │
+│ ☑ aws configure run                  │
+│ ☑ Credentials stored (~/.aws/)       │
+│ ☑ Permissions verified               │
+└──────────────────────────────────────┘
+         ↓
+┌─ Security Configuration ─────────────┐
+│ ☑ MFA enabled on root account        │
+│ ☑ CloudTrail enabled                 │
+│ ☑ Access keys rotated every 90 days  │
+│ ☑ Credentials never committed to Git │
+└──────────────────────────────────────┘
+         ↓
+       Ready to run KOPS! ✅
+```
+
+---
+
+## References
+
+- [AWS IAM Best Practices](https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html)
+- [AWS Access Keys](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html)
+- [AWS CloudTrail](https://docs.aws.amazon.com/awscloudtrail/)
+- [KOPS AWS IAM Requirements](https://kops.sigs.k8s.io/getting_started/aws/)
+- [AWS Security Best Practices](https://aws.amazon.com/architecture/security-identity-compliance/)
+````
+
+---
+
+## 📊 Visual Guide: IAM User Creation
+
+```
+AWS Management Console
+    |
+    ├─ Step 1: Create User
+    |   ├─ Name: kops-user
+    |   ├─ Console access: Yes (optional)
+    |   └─ Programmatic access: Yes (required)
+    |
+    ├─ Step 2: Add Permissions
+    |   ├─ AmazonEC2FullAccess ✓
+    |   ├─ AmazonS3FullAccess ✓
+    |   ├─ IAMFullAccess ✓
+    |   └─ AmazonVPCFullAccess ✓
+    |
+    └─ Step 3: Get Access Keys
+        ├─ Access Key ID: AKIA...
+        └─ Secret Access Key: wJal...
+            |
+            └─ Download CSV
+                |
+                └─ Local Machine
+                    |
+                    ├─ aws configure
+                    ├─ Set credentials
+                    └─ Test: aws sts get-caller-identity ✅
+```
+
+---
+
+## 🔐 Security Best Practices Summary
+
+| Practice | Why | How |
+|----------|-----|-----|
+| **Don't use root** | Root = all AWS access | Use IAM user with limited permissions |
+| **Rotate keys** | Leaked credentials expire | Rotate every 90 days |
+| **Never commit** | Git repos are public | Add ~/.aws/ to .gitignore |
+| **Store securely** | Prevent unauthorized access | Use ~/.aws/credentials (chmod 600) |
+| **Enable MFA** | Prevent account takeover | Use authenticator app on root |
+| **Monitor activity** | Detect breaches early | Enable CloudTrail logging |
+| **Minimal permissions** | Reduce blast radius | Only grant needed permissions |
+| **Use IAM policies** | Fine-grained control | Create custom policies if needed |
+
+---
+
+## ✅ Verification Commands
+
+```bash
+# 1. Verify AWS CLI installed
+aws --version
+
+# 2. Verify credentials configured
+aws sts get-caller-identity
+
+# 3. Verify S3 access
+aws s3 ls
+
+# 4. Verify EC2 access
+aws ec2 describe-regions
+
+# 5. Verify IAM access
+aws iam list-users
+
+# 6. Verify VPC access
+aws ec2 describe-vpcs
+
+# All commands should return data without errors ✅
+```
+
+---
+
+**Now you're ready to create your KOPS cluster!** 🚀
 
 ## Create Kubernetes Cluster with KOPS
 
@@ -95,12 +656,716 @@ aws s3api get-bucket-versioning \
 #     "Status": "Enabled",
 #     "MFADelete": "Disabled"
 # }
+# versioning is enabled to prevent data lost, keeping all data safe, secure
 ```
 
-*** Configure Cluster name with Domain ***
+### Configure Cluster name with Domain ( Optional you can go with out this) ###
 ```bash
 aws route53 create-hosted-zone --name kishordev.me --caller-reference 1
 ```
+# AWS Route53: Configure Custom Domain for KOPS Cluster 🌐
+
+Let me provide a comprehensive guide for setting up a custom domain with your KOPS cluster using Route53.
+
+---
+
+````markdown
+## Configure Custom Domain with Route53 (Optional but Recommended)
+
+### What is Route53?
+
+Route53 is AWS's DNS service. It translates domain names to IP addresses.
+
+```
+User types in browser:
+  api.kishordev.me
+        ↓
+Route53 DNS lookup
+        ↓
+Returns IP: 10.0.1.10 (your control-plane)
+        ↓
+Browser connects to API server
+```
+
+### Why Use Custom Domain?
+
+```
+Without custom domain:
+  kubectl config set-cluster myCluster --server=https://10.0.1.10:6443
+  └─ IP changes if you recreate cluster
+  └─ Hard to remember
+  └─ Not production-ready
+
+With custom domain:
+  kubectl config set-cluster myCluster --server=https://api.kishordev.me:6443
+  └─ IP can change, domain stays same
+  └─ Easy to remember
+  └─ Professional & production-ready
+```
+
+### Step 1: Register Domain (or Use Existing)
+
+**Option A: Use domain you already own**
+```
+If you already have kishordev.me registered elsewhere:
+├─ Update nameservers to point to Route53
+├─ (Instructions vary by registrar)
+└─ Takes 24-48 hours to propagate
+```
+
+**Option B: Register new domain**
+```
+If you don't have a domain:
+├─ Go to Route53 console
+├─ Click "Domains" → "Register domain"
+├─ Search for your domain
+├─ Follow registration wizard
+└─ Costs $10-15/year
+```
+
+**Option C: Use subdomain of existing domain**
+```
+If you have example.com registered elsewhere:
+├─ Create k8s.example.com using Route53
+├─ Update nameservers on example.com registrar
+└─ Points to Route53 for k8s subdomain
+```
+
+For this guide, we'll assume **kishordev.me** is your domain.
+
+---
+
+### Step 2: Create Hosted Zone in Route53
+
+**What is Hosted Zone?**
+```
+A hosted zone is where Route53 stores DNS records for your domain.
+
+Example records:
+  api.kishordev.me      → 10.0.1.10 (control-plane)
+  nginx.kishordev.me    → 10.0.1.20 (service)
+  www.kishordev.me      → 10.0.2.5  (another service)
+```
+
+**Create hosted zone:**
+
+```bash
+aws route53 create-hosted-zone \
+  --name kishordev.me \
+  --caller-reference $(date +%s)
+
+# Expected output:
+# {
+#     "HostedZone": {
+#         "Id": "/hostedzone/Z1234567890ABC",
+#         "Name": "kishordev.me.",
+#         "CallerReference": "1703362951",
+#         "Config": {
+#             "PrivateZone": false
+#         },
+#         "ResourceRecordSetCount": 2
+#     },
+#     "ChangeInfo": {
+#         "Status": "PENDING",
+#         "SubmittedAt": "2025-12-23T22:30:00.000Z"
+#     },
+#     "DelegationSet": {
+#         "NameServers": [
+#             "ns-123.awsdns-45.com",
+#             "ns-678.awsdns-90.eu",
+#             "ns-901.awsdns-23.net",
+#             "ns-234.awsdns-56.co.uk"
+#         ]
+#     }
+# }
+```
+
+**Save the important values:**
+```
+Hosted Zone ID: /hostedzone/Z1234567890ABC
+NameServers:
+  - ns-123.awsdns-45.com
+  - ns-678.awsdns-90.eu
+  - ns-901.awsdns-23.net
+  - ns-234.awsdns-56.co.uk
+```
+
+---
+
+### Step 3: Update Domain Nameservers (if domain elsewhere)
+
+**If you registered domain on GoDaddy, Namecheap, etc:**
+
+1. Login to your domain registrar
+2. Find "Nameservers" or "DNS Settings"
+3. Replace with Route53 nameservers from Step 2
+4. Save changes
+5. Wait 24-48 hours for propagation
+
+**Verify DNS propagation:**
+```bash
+# Check if nameservers are set
+nslookup kishordev.me
+
+# Should show Route53 nameservers from Step 2
+```
+
+---
+
+### Step 4: Create DNS Records for KOPS Cluster
+
+**Get your control-plane IP:**
+
+```bash
+# After cluster is running, get the API endpoint
+CONTROL_PLANE_IP=$(aws ec2 describe-instances \
+  --region us-east-1 \
+  --query 'Reservations[*].Instances[?Tags[?Key==`kops.k8s.io/instancegroup` && Value==`control-plane-us-east-1a`]].PublicIpAddress' \
+  --output text)
+
+echo "Control-plane IP: $CONTROL_PLANE_IP"
+# Output: Control-plane IP: 52.123.45.67
+```
+
+**Create A record (maps domain to IP):**
+
+```bash
+# Store hosted zone ID
+HOSTED_ZONE_ID="Z1234567890ABC"
+
+# Create DNS record
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $HOSTED_ZONE_ID \
+  --change-batch '{
+    "Changes": [
+      {
+        "Action": "CREATE",
+        "ResourceRecordSet": {
+          "Name": "api.kishordev.me",
+          "Type": "A",
+          "TTL": 300,
+          "ResourceRecords": [
+            {
+              "Value": "52.123.45.67"
+            }
+          ]
+        }
+      }
+    ]
+  }'
+
+# Expected output:
+# {
+#     "ChangeInfo": {
+#         "Id": "/change/C1234567890ABC",
+#         "Status": "PENDING",
+#         "SubmittedAt": "2025-12-23T22:35:00.000Z"
+#     }
+# }
+```
+
+**Verify DNS record created:**
+
+```bash
+# Wait a few seconds, then check
+nslookup api.kishordev.me
+
+# Should return:
+# Server:  8.8.8.8
+# Address: 8.8.8.8#53
+# 
+# Non-authoritative answer:
+# Name: api.kishordev.me
+# Address: 52.123.45.67
+```
+
+---
+
+### Step 5: Update KOPS Cluster to Use Custom Domain
+
+**Update cluster config:**
+
+```bash
+kops edit cluster
+
+# In the editor, find this section:
+# spec:
+#   masterPublicName: api.demok8scluster1.k8s.local
+#
+# Change to:
+# spec:
+#   masterPublicName: api.kishordev.me
+
+# Save and exit (:wq)
+```
+
+**Apply the change:**
+
+```bash
+kops update cluster --yes
+
+# Wait a few minutes for update to complete
+```
+
+**Verify it worked:**
+
+```bash
+# Update your kubeconfig to use new domain
+aws eks update-kubeconfig \
+  --name demok8scluster1.k8s.local \
+  --region us-east-1
+
+# Or manually edit ~/.kube/config
+# Find this line:
+#   server: https://10.0.1.10:6443
+# Change to:
+#   server: https://api.kishordev.me:6443
+
+# Test connection
+kubectl cluster-info
+
+# Should show:
+# Kubernetes control plane is running at https://api.kishordev.me:6443
+```
+
+---
+
+## Complete Script: Setup Domain in 1 Command
+
+Save this as `setup-domain.sh`:
+
+````bash
+#!/bin/bash
+
+# Set variables
+DOMAIN="kishordev.me"
+CLUSTER_NAME="demok8scluster1.k8s.local"
+REGION="us-east-1"
+
+echo "🌐 Setting up Route53 for Kubernetes cluster..."
+echo "=================================================="
+
+# Step 1: Create hosted zone
+echo "Step 1: Creating hosted zone..."
+ZONE_RESPONSE=$(aws route53 create-hosted-zone \
+  --name $DOMAIN \
+  --caller-reference $(date +%s) \
+  --query 'HostedZone.Id' \
+  --output text)
+
+HOSTED_ZONE_ID=$(echo $ZONE_RESPONSE | sed 's/\/hostedzone\///')
+echo "✅ Hosted Zone ID: $HOSTED_ZONE_ID"
+
+# Step 2: Get nameservers
+echo ""
+echo "Step 2: Getting nameservers..."
+NS_RECORDS=$(aws route53 get-hosted-zone \
+  --id $HOSTED_ZONE_ID \
+  --query 'DelegationSet.NameServers' \
+  --output text)
+
+echo "✅ Nameservers created:"
+echo "   $NS_RECORDS"
+echo ""
+echo "⚠️  If your domain is registered elsewhere:"
+echo "   1. Login to your registrar (GoDaddy, Namecheap, etc)"
+echo "   2. Update nameservers to the above list"
+echo "   3. Wait 24-48 hours for DNS propagation"
+echo ""
+echo "   Or update in AWS Console:"
+echo "   https://console.aws.amazon.com/route53/"
+echo ""
+
+# Step 3: Get control-plane IP
+echo "Step 3: Getting control-plane IP..."
+CONTROL_PLANE_IP=$(aws ec2 describe-instances \
+  --region $REGION \
+  --filters "Name=tag:kops.k8s.io/instancegroup,Values=control-plane-us-east-1a" \
+  --query 'Reservations[*].Instances[0].PublicIpAddress' \
+  --output text)
+
+if [ "$CONTROL_PLANE_IP" = "None" ] || [ -z "$CONTROL_PLANE_IP" ]; then
+  echo "❌ Control-plane not found. Make sure cluster is created:"
+  echo "   kops update cluster --yes"
+  exit 1
+fi
+
+echo "✅ Control-plane IP: $CONTROL_PLANE_IP"
+echo ""
+
+# Step 4: Create DNS record
+echo "Step 4: Creating DNS A record..."
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $HOSTED_ZONE_ID \
+  --change-batch "{
+    \"Changes\": [
+      {
+        \"Action\": \"CREATE\",
+        \"ResourceRecordSet\": {
+          \"Name\": \"api.$DOMAIN\",
+          \"Type\": \"A\",
+          \"TTL\": 300,
+          \"ResourceRecords\": [
+            {
+              \"Value\": \"$CONTROL_PLANE_IP\"
+            }
+          ]
+        }
+      }
+    ]
+  }"
+
+echo "✅ DNS record created: api.$DOMAIN → $CONTROL_PLANE_IP"
+echo ""
+
+# Step 5: Update KOPS cluster
+echo "Step 5: Updating KOPS cluster..."
+kops edit cluster \
+  --name=$CLUSTER_NAME \
+  --state=s3://kops-kkp-storage-1
+
+echo ""
+echo "⚠️  In the editor that opened:"
+echo "   1. Find: masterPublicName: api.demok8scluster1.k8s.local"
+echo "   2. Change to: masterPublicName: api.$DOMAIN"
+echo "   3. Save and exit (:wq)"
+echo ""
+
+# Step 6: Apply changes
+echo "Step 6: Applying changes to cluster..."
+kops update cluster \
+  --name=$CLUSTER_NAME \
+  --state=s3://kops-kkp-storage-1 \
+  --yes
+
+echo ""
+echo "⏳ Waiting for updates to complete (5 minutes)..."
+sleep 300
+
+# Step 7: Verify
+echo ""
+echo "Step 7: Verifying DNS..."
+echo "Testing: nslookup api.$DOMAIN"
+nslookup api.$DOMAIN
+
+echo ""
+echo "✅ Domain setup complete!"
+echo ""
+echo "Update your kubeconfig:"
+echo "  kubectl config set-cluster $CLUSTER_NAME --server=https://api.$DOMAIN:6443"
+echo ""
+echo "Or edit ~/.kube/config manually and replace IP with domain"
+````
+
+**Run it:**
+```bash
+chmod +x setup-domain.sh
+./setup-domain.sh
+```
+
+---
+
+## Troubleshooting
+
+### DNS not resolving
+
+```bash
+# Check if hosted zone was created
+aws route53 list-hosted-zones
+
+# Check if DNS record exists
+aws route53 list-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC
+
+# Manually check DNS
+nslookup api.kishordev.me 8.8.8.8  # Use Google's DNS
+
+# If still not working:
+# 1. Check nameservers are updated (24-48 hours)
+# 2. Clear DNS cache:
+#    - Linux: sudo systemctl restart systemd-resolved
+#    - Mac: sudo dscacheutil -flushcache
+#    - Windows: ipconfig /flushdns
+```
+
+### kubectl still can't connect
+
+```bash
+# Check what kubeconfig is using
+kubectl config view
+
+# Manually update server URL
+kubectl config set-cluster $CLUSTER_NAME \
+  --server=https://api.kishordev.me:6443
+
+# Test
+kubectl cluster-info
+```
+
+### Domain points to wrong IP
+
+```bash
+# Get current control-plane IP
+aws ec2 describe-instances \
+  --region us-east-1 \
+  --filters "Name=tag:kops.k8s.io/instancegroup,Values=control-plane-us-east-1a" \
+  --query 'Reservations[*].Instances[0].PublicIpAddress' \
+  --output text
+
+# Update DNS record if IP changed
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [
+      {
+        "Action": "UPSERT",
+        "ResourceRecordSet": {
+          "Name": "api.kishordev.me",
+          "Type": "A",
+          "TTL": 300,
+          "ResourceRecords": [
+            {
+              "Value": "NEW_IP_HERE"
+            }
+          ]
+        }
+      }
+    ]
+  }'
+```
+
+---
+
+## Advanced: Create Additional DNS Records
+
+### For Services (NodePort, LoadBalancer)
+
+```bash
+# Get service IP/hostname
+kubectl get svc -n default
+
+# Create DNS record for service
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [
+      {
+        "Action": "CREATE",
+        "ResourceRecordSet": {
+          "Name": "app.kishordev.me",
+          "Type": "A",
+          "TTL": 300,
+          "ResourceRecords": [
+            {
+              "Value": "10.0.1.20"
+            }
+          ]
+        }
+      }
+    ]
+  }'
+```
+
+### Create CNAME Record (alias)
+
+```bash
+# Create alias pointing to another domain
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [
+      {
+        "Action": "CREATE",
+        "ResourceRecordSet": {
+          "Name": "www.kishordev.me",
+          "Type": "CNAME",
+          "TTL": 300,
+          "ResourceRecords": [
+            {
+              "Value": "api.kishordev.me"
+            }
+          ]
+        }
+      }
+    ]
+  }'
+```
+
+---
+
+## Cost Considerations
+
+```
+Route53 Pricing (as of 2025):
+├─ Hosted Zone: $0.50/month per zone
+├─ Query: $0.40 per million queries
+└─ Domain registration: $10-15/year (varies by TLD)
+
+Example monthly cost for small cluster:
+├─ 1 hosted zone: $0.50
+├─ 1 million queries/month: $0.40
+└─ Total: ~$1/month (very cheap!)
+```
+
+---
+
+## Best Practices
+
+```
+✅ DO:
+├─ Use custom domain for professional setup
+├─ Use TTL 300 (5 minutes) for flexibility
+├─ Monitor DNS resolution
+├─ Keep DNS records in version control
+├─ Document your domain setup
+├─ Use multiple A records for HA setup
+└─ Regularly test DNS resolution
+
+❌ DON'T:
+├─ Use very long TTL (delays updates)
+├─ Point domain to private IPs (not accessible)
+├─ Forget to update nameservers
+├─ Delete hosted zone without backing up records
+├─ Use wildcard records carelessly
+└─ Rely on IP address (it can change)
+```
+
+---
+
+## Complete Reference
+
+### Create Hosted Zone
+```bash
+aws route53 create-hosted-zone \
+  --name kishordev.me \
+  --caller-reference $(date +%s)
+```
+
+### List Hosted Zones
+```bash
+aws route53 list-hosted-zones
+```
+
+### Get Nameservers
+```bash
+aws route53 get-hosted-zone \
+  --id /hostedzone/Z1234567890ABC \
+  --query 'DelegationSet.NameServers' \
+  --output table
+```
+
+### List DNS Records
+```bash
+aws route53 list-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC
+```
+
+### Create A Record
+```bash
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch file://changes.json
+```
+
+### Delete Record
+```bash
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z1234567890ABC \
+  --change-batch '{
+    "Changes": [
+      {
+        "Action": "DELETE",
+        "ResourceRecordSet": {
+          "Name": "api.kishordev.me",
+          "Type": "A",
+          "TTL": 300,
+          "ResourceRecords": [
+            {
+              "Value": "52.123.45.67"
+            }
+          ]
+        }
+      }
+    ]
+  }'
+```
+
+### Delete Hosted Zone
+```bash
+# ⚠️ WARNING: Cannot delete if records exist
+# Delete all records first, then:
+aws route53 delete-hosted-zone --id Z1234567890ABC
+```
+
+---
+
+## Summary
+
+```
+Without Route53:        With Route53:
+kubectl config set-    ├─ Professional domain
+cluster myCluster       ├─ Easy to remember
+--server=https://      ├─ IP changes? Domain stays same
+10.0.1.10:6443        ├─ Can add multiple services
+└─ Hard to manage     └─ DNS records managed in AWS
+```
+
+**Now your cluster is accessible via:** `api.kishordev.me` 🚀
+
+---
+
+**Last Updated:** December 23, 2025
+**AWS Service:** Route53
+**Status:** Production-ready
+````
+
+---
+
+## 📊 Visual Guide
+
+```
+Domain Registration Process
+═══════════════════════════════════════════════════════════
+
+Step 1: Register Domain
+   kishordev.me (on GoDaddy, Namecheap, etc.)
+           ↓
+Step 2: Create Route53 Hosted Zone
+   AWS Route53 creates zone for kishordev.me
+           ↓
+Step 3: Update Nameservers
+   Point domain registrar to Route53 nameservers
+   (24-48 hours propagation)
+           ↓
+Step 4: Create DNS A Record
+   api.kishordev.me → 10.0.1.10
+           ↓
+Step 5: Update KOPS Cluster
+   masterPublicName: api.kishordev.me
+           ↓
+Step 6: Test
+   nslookup api.kishordev.me ✅
+   kubectl cluster-info ✅
+   Browser: https://api.kishordev.me ✅
+```
+
+---
+
+## 🎯 Quick Reference Commands
+
+| Task | Command |
+|------|---------|
+| Create hosted zone | `aws route53 create-hosted-zone --name kishordev.me --caller-reference $(date +%s)` |
+| List zones | `aws route53 list-hosted-zones` |
+| Get nameservers | `aws route53 get-hosted-zone --id /hostedzone/Z123 --query 'DelegationSet.NameServers'` |
+| Create A record | `aws route53 change-resource-record-sets --hosted-zone-id Z123 --change-batch '...'` |
+| List records | `aws route53 list-resource-record-sets --hosted-zone-id Z123` |
+| Test DNS | `nslookup api.kishordev.me` |
+| Update kubeconfig | `kubectl config set-cluster myCluster --server=https://api.kishordev.me:6443` |
+
+---
+
+**You now have a production-ready Kubernetes cluster with a custom domain!** 🌐✨
 
 ### Step 3: Create Cluster Configuration
 ```bash
