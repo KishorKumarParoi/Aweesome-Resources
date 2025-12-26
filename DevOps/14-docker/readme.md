@@ -321,4 +321,62 @@ CMD ["node", "server.js"]
 
 ---
 
+## **1. Docker Advanced Networking**
+
+**Types of Networks:**
+- **Bridge** (default): Isolated network for containers
+- **Host**: Container uses host's network stack
+- **Overlay**: Multi-host networking for Swarm/Kubernetes
+- **Macvlan**: Assign MAC addresses to containers
+
+**Example - Custom Bridge Network:**
+```bash
+docker network create my-app-network
+docker run --network my-app-network --name flask-app myapp:latest
+docker run --network my-app-network --name db postgres:latest
+```
+
+## **2. Multistage Builds**
+
+Reduces image size by separating build and runtime stages.
+
+````dockerfile
+# Stage 1: Builder
+FROM python:3.11-slim as builder
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --user -r requirements.txt
+
+# Stage 2: Runtime
+FROM python:3.11-slim
+WORKDIR /app
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+COPY . .
+EXPOSE 8000
+CMD ["python3", "main.py"]
+````
+
+## **3. Multiplatform Builds**
+
+Build images for multiple architectures (ARM64, AMD64, etc.):
+
+```bash
+# Enable BuildKit
+export DOCKER_BUILDKIT=1
+
+# Build for multiple platforms
+docker buildx build --platform linux/amd64,linux/arm64 -t myapp:latest .
+
+# Push to registry
+docker buildx build --platform linux/amd64,linux/arm64 -t myapp:latest --push .
+```
+
+**Docker Buildx setup:**
+```bash
+docker buildx create --name mybuilder
+docker buildx use mybuilder
+docker buildx inspect --bootstrap
+```
+
 **Last Updated:** December 22, 2025
