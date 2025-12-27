@@ -17,6 +17,19 @@ spec:
       containers:
       - name: python-app
         image: kishorkumarparoi/python-web-app:v1
+        volumeMounts: 
+        - name: db-connection
+          mountPath: /opt
+        env: 
+        - name: DB-PORT
+          valueFrom: 
+            configMapKeyRef: 
+              name: test-cm
+              key: db-port
         ports:
         - containerPort: 8000
+      volumes:
+        - name: db-connection
+          configMap: 
+            name: test-cm 
 
