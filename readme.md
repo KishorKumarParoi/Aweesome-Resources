@@ -4,40 +4,31 @@ A comprehensive, curated collection of learning resources organized by topic. Th
 
 ---
 
-# ╔════════════════════════════════════════════════════════════════════╗
-# ║                                                                    ║
-# ║     🎆  2 0 2 5   N E W   Y E A R   R E S O L U T I O N  🎆       ║
-# ║                                                                    ║
-# ╠════════════════════════════════════════════════════════════════════╣
-# ║                                                                    ║
-# ║   ┌──────────────────────────────────────────────────────────┐    ║
-# ║   │                    🎯 THE 6x GOALS 🎯                    │    ║
-# ║   └──────────────────────────────────────────────────────────┘    ║
-# ║                                                                    ║
-# ║         💪  6 PACK           │  Fitness & Health                  ║
-# ║        ─────────────────────────────────────────────              ║
-# ║         💰  600K             │  Financial Freedom                 ║
-# ║        ─────────────────────────────────────────────              ║
-# ║         ⭐  6-STAR CODER     │  Technical Excellence              ║
-# ║        ─────────────────────────────────────────────              ║
-# ║         📄  6 PAPERS         │  Research & Publications           ║
-# ║        ─────────────────────────────────────────────              ║
-# ║         🎤  6 CONFERENCES    │  Speaking & Networking             ║
-# ║        ─────────────────────────────────────────────              ║
-# ║         📺  600K SUBSCRIBERS │  Content & Community               ║
-# ║                                                                    ║
-# ║   ┌──────────────────────────────────────────────────────────┐    ║
-# ║   │         "Dream Big. Work Hard. Stay Consistent."         │    ║
-# ║   └──────────────────────────────────────────────────────────┘    ║
-# ║                                                                    ║
-# ║                      🚀 LET'S CRUSH 2026! 🚀                      ║
-# ║                                                                    ║
-# ╚════════════════════════════════════════════════════════════════════╝
+## 🎆 2026 NEW YEAR RESOLUTION 🎆
 
-## 📊 Progress Tracker
+```
+╔════════════════════════════════════════════════════════════════════╗
+║                                                                    ║
+║                    🎯 THE 6x GOALS 🎯                              ║
+║                                                                    ║
+║         💪  6 PACK           │  Fitness & Health                  ║
+║         💰  600K             │  Financial Freedom                 ║
+║         ⭐  6-STAR CODER     │  Technical Excellence              ║
+║         📄  6 PAPERS         │  Research & Publications           ║
+║         🎤  6 CONFERENCES    │  Speaking & Networking             ║
+║         📺  600K SUBSCRIBERS │  Content & Community               ║
+║                                                                    ║
+║         "Dream Big. Work Hard. Stay Consistent."                   ║
+║                                                                    ║
+║                      🚀 LET'S CRUSH 2026! 🚀                       ║
+║                                                                    ║
+╚════════════════════════════════════════════════════════════════════╝
+```
+
+### 📊 Progress Tracker
 
 | Goal | Target | Q1 | Q2 | Q3 | Q4 | Status |
-|------|--------|----|----|----|----|--------|
+|------|--------|:--:|:--:|:--:|:--:|:------:|
 | 💪 6 Pack | Visible abs | ⬜ | ⬜ | ⬜ | ⬜ | 🔄 |
 | 💰 600K | Income/Savings | ⬜ | ⬜ | ⬜ | ⬜ | 🔄 |
 | ⭐ 6-Star Coder | Top ratings | ⬜ | ⬜ | ⬜ | ⬜ | 🔄 |
@@ -45,13 +36,11 @@ A comprehensive, curated collection of learning resources organized by topic. Th
 | 🎤 6 Conferences | Attended/Spoke | ⬜ | ⬜ | ⬜ | ⬜ | 🔄 |
 | 📺 600K Subs | YouTube/Social | ⬜ | ⬜ | ⬜ | ⬜ | 🔄 |
 
----
-
 > **"The only limit is the one you set yourself."**
 
-🗓️ Started: January 1, 2026
-🎯 Deadline: December 31, 2026
+🗓️ **Started:** January 1, 2026 | 🎯 **Deadline:** December 31, 2026
 
+---
 
 ## 📚 Quick Navigation
 
