@@ -282,7 +282,7 @@ Add the following lines before `</tomcat-users>`:
 <role rolename="manager-gui"/>
 <user username="admin" password="your_secure_password" roles="manager-gui"/>
 <role rolename="admin-gui"/>
-<user username="tomcat_admin" password="your_secure_password" roles="admin-gui"/>
+<user username="tomcat_admin" password="your_secure_password" roles="admin-gui,manager-gui,manager-script"/>
 ```
 
 Save the file and restart Tomcat:
