@@ -5,6 +5,58 @@ Apache Tomcat is an open-source Java application server that runs Java servlets 
 
 ---
 
+## Quick Setup Script
+
+Here's a complete list of commands to set up Tomcat from scratch:
+
+```bash
+# Update system packages
+sudo apt update
+sudo apt upgrade -y
+
+# Install Java 11 JDK
+sudo apt install openjdk-11-jdk -y
+java -version
+
+# Create tomcat user
+sudo useradd -m -U -d /opt/tomcat -s /bin/false tomcat
+
+# Download and extract Tomcat 10.1.5
+cd /opt
+sudo wget https://archive.apache.org/dist/tomcat/tomcat-10/v10.1.5/bin/apache-tomcat-10.1.5.tar.gz
+sudo tar -xf apache-tomcat-*.tar.gz -C /opt/tomcat --strip-components=1
+
+# Set permissions
+sudo chown -R tomcat:tomcat /opt/tomcat/
+sudo chmod -R u+x /opt/tomcat/bin
+
+# Configure systemd service
+sudo vi /etc/systemd/system/tomcat.service
+
+# Enable and start Tomcat
+sudo systemctl daemon-reload
+sudo systemctl enable tomcat
+sudo systemctl start tomcat
+sudo systemctl status tomcat
+
+# Configure Tomcat users
+sudo vi /opt/tomcat/conf/tomcat-users.xml
+
+# Verify Tomcat is running
+curl localhost:8080
+
+# Configure firewall rules
+sudo ufw allow 8080/tcp
+sudo ufw allow 22/tcp
+sudo ufw enable
+sudo ufw status
+
+# Check Tomcat again
+curl localhost:8080
+```
+
+---
+
 ## Prerequisites
 
 - Ubuntu 18.04 or later
