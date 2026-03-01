@@ -1,261 +1,103 @@
-name: CI/CD Pipeline
+name: CICD By DevOps Shack
 
 on:
   push:
-    branches:
-      - main
-      - develop
-  pull_request:
-    branches:
-      - main
-
-env:
-  DOCKER_IMAGE: kishorkumarparoi/boardgame:latest
-  DOCKER_IMAGE_SHA: kishorkumarparoi/boardgame:${{ github.sha }}
-  MAVEN_OPTS: "-Dmaven.repo.local=$HOME/.m2"
+    branches: ["main"]
 
 jobs:
-  # ============= INSTALL TOOLS =============
-  install-tools:
-    name: Install Tools
-    runs-on: ubuntu-latest
+  build:
+    runs-on: self-hosted
+    timeout-minutes: 60
+
     steps:
+      # ============= CHECKOUT =============
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v3
+      # ============= SETUP JAVA =============
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: maven
 
-      - name: Install Maven
-        run: |
-          sudo apt update
-          sudo apt install -y maven
+      # ============= BUILD APPLICATION =============
+      - name: Build with Maven
+        run: mvn clean package
 
-      - name: Install Trivy
-        run: |
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
-          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
-          sudo apt update && sudo apt install -y trivy
-
-      - name: Install kubectl
-        run: |
-          curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | gpg --dearmor | sudo tee /etc/apt/keyrings/kubernetes-apt-keyring.gpg > /dev/null
-          echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
-          sudo apt update && sudo apt install -y kubectl
-
-      - name: Verify installations
-        run: |
-          echo "=== Installation Summary ==="
-          java -version
-          mvn --version
-          trivy version
-          docker --version
-          kubectl version --client
-          echo "✅ All tools installed successfully"
-
-  # ============= UNIT TESTING =============
-  unit-testing:
-    name: Unit Testing
-    runs-on: ubuntu-latest
-    needs: install-tools
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v3
+      # ============= UPLOAD BUILD ARTIFACTS =============
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Run unit tests
-        run: mvn clean test
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-results
-          path: target/surefire-reports/
-
-      - name: Publish test results
-        if: always()
-        uses: EnricoMi/publish-unit-test-result-action@v2
-        with:
-          files: target/surefire-reports/TEST-*.xml
-          check_name: Unit Test Results
-
-  # ============= SECURITY: TRIVY SCAN =============
-  trivy-fs-scan:
-    name: Trivy Filesystem Scan
-    runs-on: ubuntu-latest
-    needs: install-tools
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-fs-report.sarif'
-
-      - name: Upload Trivy report to GitHub Security
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: 'trivy-fs-report.sarif'
-          category: 'trivy-fs'
-
-      - name: Run Trivy with table format
-        uses: aquasecurity/trivy-action@master
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'table'
-          output: 'trivy-fs-report.txt'
-
-      - name: Upload Trivy results
-        uses: actions/upload-artifact@v3
-        if: always()
-        with:
-          name: trivy-reports
-          path: trivy-fs-report.*
-
-  # ============= SECURITY: SONARQUBE =============
-  sonarqube-scan:
-    name: SonarQube Analysis
-    runs-on: ubuntu-latest
-    needs: unit-testing
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Cache SonarQube packages
-        uses: actions/cache@v3
-        with:
-          path: ~/.sonar/cache
-          key: ${{ runner.os }}-sonar
-          restore-keys: ${{ runner.os }}-sonar
-
-      - name: Cache Maven packages
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-
-      - name: Run SonarQube scan
-        env:
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          SONAR_LOGIN: ${{ secrets.SONAR_AUTH_TOKEN }}
-        run: |
-          mvn -B verify sonar:sonar \
-            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }} \
-            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-            -Dsonar.login=${{ secrets.SONAR_AUTH_TOKEN }}
-        continue-on-error: true
-
-  # ============= BUILD APPLICATION =============
-  build-app:
-    name: Build Application
-    runs-on: ubuntu-latest
-    needs: unit-testing
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-          cache: maven
-
-      - name: Build Maven application
-        run: mvn clean package -DskipTests
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: build-artifacts
-          path: |
-            target/*.jar
-            Dockerfile
-            deployment-service.yaml
+          name: my-artifact
+          path: target/*.jar
           retention-days: 1
 
-  # ============= DOCKER BUILD & PUSH =============
-  docker-build-push:
-    name: Docker Build & Push
-    runs-on: ubuntu-latest
-    needs: [build-app, trivy-fs-scan]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      # ============= SECURITY: TRIVY FS SCAN =============
+      - name: Trivy Filesystem Scan
+        run: |
+          trivy fs --format table -o trivy-fs-report.html .
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v3
+      - name: Upload Trivy FS report
+        uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: build-artifacts
+          name: trivy-fs-report
+          path: trivy-fs-report.html
+
+      # ============= CODE QUALITY: SONARQUBE =============
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: SonarQube Quality Gate check
+        id: sonarqube-quality-gate-check
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        continue-on-error: true
+
+      # ============= DOCKER: SETUP =============
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
+      # ============= DOCKER: BUILD =============
+      - name: Build Docker Image
+        run: |
+          docker build -t adijaiswal/boardgame:latest .
+
+      # ============= SECURITY: TRIVY IMAGE SCAN =============
+      - name: Trivy Image Scan
+        run: |
+          trivy image --format table -o trivy-image-report.html adijaiswal/boardgame:latest
+
+      - name: Upload Trivy Image report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-image-report
+          path: trivy-image-report.html
+
+      # ============= DOCKER: LOGIN & PUSH =============
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v4
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ env.DOCKER_IMAGE }}
-            ${{ env.DOCKER_IMAGE_SHA }}
-          cache-from: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.DOCKER_IMAGE }}:buildcache,mode=max
+      - name: Push Docker Image
+        run: |
+          docker push adijaiswal/boardgame:latest
 
-      - name: Run Trivy image scan
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ${{ env.DOCKER_IMAGE_SHA }}
-          format: 'sarif'
-          output: 'trivy-image-report.sarif'
-
-      - name: Upload Trivy image report
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: 'trivy-image-report.sarif'
-          category: 'trivy-image'
-
-  # ============= KUBERNETES DEPLOY =============
-  k8s-deploy:
-    name: Deploy to Kubernetes
-    runs-on: ubuntu-latest
-    needs: docker-build-push
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      # ============= KUBERNETES: DEPLOY =============
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
@@ -263,39 +105,23 @@ jobs:
 
       - name: Configure kubeconfig
         env:
-          KUBECONFIG_CONTENT: ${{ secrets.KUBECONFIG_CONTENT }}
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
         run: |
           mkdir -p $HOME/.kube
-          echo "$KUBECONFIG_CONTENT" | base64 -d > $HOME/.kube/config
+          echo "$KUBE_CONFIG" | base64 -d > $HOME/.kube/config
           chmod 600 $HOME/.kube/config
-          kubectl config view
 
       - name: Deploy to Kubernetes
         run: |
-          echo "Deploying to Kubernetes..."
-          kubectl apply -f deployment-service.yaml
-          kubectl rollout status deployment/boardgame -n default --timeout=5m || true
-          echo "=== Deployment Status ==="
-          kubectl get all -n default
-          kubectl get pods -n default -o wide
+          kubectl apply -f deployment-service.yaml -n webapps
+          kubectl get svc -n webapps
+          kubectl rollout status deployment/boardgame -n webapps --timeout=5m || true
 
-      - name: Send Slack notification (Optional)
-        if: always()
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          text: 'Kubernetes deployment ${{ job.status }}'
-          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
-        continue-on-error: true
+      # ============= NOTIFICATIONS =============
+      - name: Notify on Success
+        if: success()
+        run: echo "✅ Pipeline completed successfully!"
 
-  # ============= STATUS CHECK =============
-  status-check:
-    name: Pipeline Status
-    runs-on: ubuntu-latest
-    needs: [unit-testing, trivy-fs-scan, build-app]
-    if: always()
-    steps:
-      - name: Check pipeline status
-        run: |
-          echo "Pipeline execution completed"
-          echo "✅ All checks passed!"
+      - name: Notify on Failure
+        if: failure()
+        run: echo "❌ Pipeline failed!"
