@@ -1,0 +1,30 @@
+---
+- name: webserver configuration
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: update package cache
+      apt:
+        update_cache: yes
+
+    - name: Install Maven
+      apt:
+        name: maven
+        state: present
+    - name: Copy the Application to webserver
+      synchronize:
+        src: /home/ubuntu/BoardgameListingWebApp
+        dest: /home/ubuntu/
+
+- name: Build & Deploy
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Build the Application
+      shell: |
+        cd /home/ubuntu/BoardgameListingWebApp
+        mvn package
+    - name: Deploy The Application
+      shell: |
+        cd /home/ubuntu/BoardgameListingWebApp/target
+        nohup java -jar *.jar &
